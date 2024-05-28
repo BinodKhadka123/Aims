@@ -164,12 +164,14 @@ SIMPLE_JWT = {
 
 }
 
+AUTH_USER_MODEL='attendence.User'
+
 BASE_URL = 'http://127.0.0.1:8000'
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
-EMAIL_HOST_USER = os.getenv('EMAIL_USER')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_PASS')
+EMAIL_HOST_USER = 'sunitabuddhathoki3@gmail.com'
+EMAIL_HOST_PASSWORD = 'lugg pytx qsgw ebnf'
 EMAIL_USE_TLS = True
 
 

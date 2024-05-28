@@ -3,7 +3,7 @@ import os
 
 class Util:
     @staticmethod
-    def send_email(data):
+    def send_mail(data):
         EMAIL_FROM = 'sunitabuddhathoki3@gmail.com'  # Define the sender email address here
         email = EmailMessage(
             subject=data['subject'],

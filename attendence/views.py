@@ -15,6 +15,7 @@ from django.contrib.auth import authenticate
 from .renders import UserRenderer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
+from django.core.mail import send_mail
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -31,28 +32,24 @@ class SubjectListCreateView(ListAPIView, CreateAPIView, ListModelMixin, CreateMo
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        number_of_classes = request.data.get('number_of_classes', None)
-        error_message = None
-        
-        # Validate number_of_classes
-        if number_of_classes is not None:
-            if not (1 <= number_of_classes <= 500):
-                error_message = "Number of classes must be between 1 and 500."
-        
-        if serializer.is_valid():
-            self.perform_create(serializer)
-            subject_data = serializer.data
-            success_message = "Subject created successfully."
-            response_data = {
-                'success': True,
-                'message': success_message,
-                'data': subject_data,
-                'error': None,  # No error in success case
-            }
-            return Response(response_data, status=status.HTTP_201_CREATED)
-        else:
-            error_message = "Failed to create subject."  # Modify the error message for failure
-            return Response({'error': error_message, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            if serializer.is_valid():
+                self.perform_create(serializer)
+                subject_data = serializer.data
+                success_message = "Subject created successfully."
+                response_data = {
+                    'success': True,
+                    'message': success_message,
+                    'data': subject_data,
+                    
+                }
+                return Response(response_data, status=status.HTTP_201_CREATED)
+            else:
+                error_message = "Failed to create subject."  # Modify the error message for failure
+                return Response({'error': error_message}, status=status.HTTP_400_BAD_REQUEST)
+        except ValidationError as e:           
+            return Response({'error_message': str(e)}, 
+                                status=status.HTTP_404_NOT_FOUND)
 
 class SubjectDetailView(RetrieveAPIView, UpdateAPIView, DestroyAPIView, RetrieveModelMixin, UpdateModelMixin, DestroyModelMixin):
     queryset = Subject.objects.all()
@@ -76,29 +73,37 @@ class SubjectDetailView(RetrieveAPIView, UpdateAPIView, DestroyAPIView, Retrieve
             'message': success_message
         }
         return Response(response_data, status=status.HTTP_204_NO_CONTENT)
-class UserRegistration(APIView):
-    renderer_classes=[UserRenderer]
-    def post(self,request,format=None):
-        serializer=UserRegistrationSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            user=serializer.save()
-            token=get_tokens_for_user(user)
-            return Response({'token':token,'msg':'Registration Sucessfully'},status=status.HTTP_201_CREATED)
+class UserRegistrationAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = UserRegistrationSerializer(data=request.data)
+        try:
+            if serializer.is_valid(raise_exception=True):
+                user=serializer.save()
+                token=get_tokens_for_user(user)
+                return Response({'token':token,'msg':'Registration Sucessfully'},status=status.HTTP_201_CREATED)
+            
+            return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+        except ValidationError as e:           
+            return Response({'error_message': str(e)}, 
+                                status=status.HTTP_404_NOT_FOUND)
         
-        return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
 class UserLogin(APIView):
     renderer_classes=[UserRenderer]
     def post(self, request, format=None):
-        serializer = UserLoginSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            email = serializer.validated_data.get('email')
-            password = serializer.validated_data.get('password')
-            user = authenticate(request, email=email, password=password)
-            if user is not None:
-    
-                return Response({'msg': 'Login Successfully'}, status=status.HTTP_200_OK)
-            else:
-                return Response({'errors': {'non_field_errors': ['Email or Password is not valid']}}, 
+        try:
+            serializer = UserLoginSerializer(data=request.data)
+            if serializer.is_valid(raise_exception=True):
+                email = serializer.validated_data.get('email')
+                password = serializer.validated_data.get('password')
+                user = authenticate(request, email=email,password=password)
+                if user is not None:
+                    token=get_tokens_for_user(user)
+                    return Response({'token':token,'msg': 'Login Successfully'}, status=status.HTTP_200_OK)
+                else:
+                    return Response({'errors': {'non_field_errors': ['Email or Password is not valid']}}, 
+                                    status=status.HTTP_404_NOT_FOUND)
+        except ValidationError as e:           
+            return Response({'error_message': str(e)}, 
                                 status=status.HTTP_404_NOT_FOUND)
 
 class UserProfile(APIView):

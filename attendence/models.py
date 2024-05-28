@@ -3,6 +3,7 @@ from rest_framework import serializers
 from django.core.validators import RegexValidator
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser
+from django.contrib.auth.hashers import make_password
 
 
 class Subject(models.Model):
@@ -29,71 +30,65 @@ class Teacher(models.Model):
     phone_number = models.CharField(max_length=10, validators=[phone_number_validator])
     profile_pic=models.ImageField()
 class UserManager(BaseUserManager):
-    def create_user(self, email, name,tc, password=None,password2=None):
-        """
-        Creates and saves a User with the given email, date of
-        birth and password.
-        """
+    def create_user(self, email, fullname, phone_number, password=None, **extra_fields):
         if not email:
-            raise ValueError("Users must have an email address")
-
-        user = self.model(
-            email=self.normalize_email(email),
-            name=name,
-            tc=tc,
-        )
-
-        user.set_password(password)
+            raise ValueError('The Email field must be set')
+        email = self.normalize_email(email)
+        
+        # Use default password if not provided
+        if not password:
+            password = "password@123"
+        
+        # Hash the password
+        hashed_password = make_password(password)
+        
+        user = self.model(email=email, fullname=fullname, phone_number=phone_number, password=hashed_password, **extra_fields)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, name, tc, password=None,pasword2=None):
-        """
-        Creates and saves a superuser with the given email, date of
-        birth and password.
-        """
-        user = self.create_user(
-            email,
-            password=password,
-            name=name,
-            tc=tc,
-        )
-        user.is_admin = True
-        user.save(using=self._db)
-        return user    
+    def create_superuser(self, email, fullname, phone_number, password=None, **extra_fields):
+        extra_fields.setdefault('is_admin', True)
+
+        if extra_fields.get('is_admin') is not True:
+            raise ValueError('Superuser must have is_admin=True.')
+
+        return self.create_user(email, fullname, phone_number, password, **extra_fields)
+
+
 class User(AbstractBaseUser):
+    ROLE_CHOICES = (
+        ('teacher', 'Teacher'),
+        ('admin', 'Admin'),
+    )
     email = models.EmailField(
         verbose_name="Email",
         max_length=255,
         unique=True,
+        help_text="Enter your Email"
     )
-    name = models.CharField(max_length=100)
+    fullname = models.CharField(max_length=200, blank=False, null=False, help_text="Enter your full name")
+    password = models.CharField(max_length=200, blank=False, null=False, help_text="Enter your password")
     is_active = models.BooleanField(default=True)
-    tc=models.BooleanField()
     is_admin = models.BooleanField(default=False)
-    created_at=models.DateTimeField( auto_now_add=True)
-    updated_at=models.DateTimeField( auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    phone_number = models.CharField(max_length=10, unique=True)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
 
     objects = UserManager()
 
     USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["name","tc"]
+    REQUIRED_FIELDS = ["fullname","phone_number"]
 
     def __str__(self):
         return self.email
 
     def has_perm(self, perm, obj=None):
-        "Does the user have a specific permission?"
-        # Simplest possible answer: Yes, always
         return self.is_admin
 
     def has_module_perms(self, app_label):
-        "Does the user have permissions to view the app `app_label`?"
-        # Simplest possible answer: Yes, always
         return True
 
     @property
     def is_staff(self):
-        "Is the user a member of staff?"
-        # Simplest possible answer: All admins are staff
         return self.is_admin
