@@ -1,5 +1,5 @@
 from django.db import models
-from rest_framework import serializers
+from django.db.models import CASCADE
 from django.core.validators import RegexValidator
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser
@@ -59,14 +59,15 @@ class User(AbstractBaseUser):
     ROLE_CHOICES = (
         ('teacher', 'Teacher'),
         ('admin', 'Admin'),
+        
     )
+    fullname = models.CharField(max_length=200, blank=False, null=False, help_text="Enter your full name")
     email = models.EmailField(
         verbose_name="Email",
         max_length=255,
         unique=True,
         help_text="Enter your Email"
     )
-    fullname = models.CharField(max_length=200, blank=False, null=False, help_text="Enter your full name")
     password = models.CharField(max_length=200, blank=False, null=False, help_text="Enter your password")
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
@@ -92,3 +93,22 @@ class User(AbstractBaseUser):
     @property
     def is_staff(self):
         return self.is_admin
+
+class Student(models.Model):
+    phone_number_validator = RegexValidator(
+        regex=r'^\d{10}$',
+        message='Phone number must be 10 digits long.',
+        code='invalid_phone_number'
+    )
+    fullname=models.CharField(max_length=100)
+    email =models.EmailField()
+    phone_number = models.CharField(max_length=10, validators=[phone_number_validator])
+    def __str__(self):
+        return self.fullname
+class Group(models.Model):
+    name=models.CharField(max_length=50)
+    student_name=models.ForeignKey(Student,on_delete=CASCADE)
+    teacher_name=models.ForeignKey(User,on_delete=CASCADE)
+    subject_name=models.ForeignKey(Subject,on_delete=CASCADE)
+    def __str__(self):
+        return self.name

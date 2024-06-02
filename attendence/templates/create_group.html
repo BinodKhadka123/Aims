@@ -1,0 +1,26 @@
+<!-- group_form.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Group</title>
+</head>
+<body>
+    <h1>Create Group</h1>
+    <form method="post">
+        {% csrf_token %}
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name"><br>
+        <label for="student_name">Student Name:</label>
+        <input type="text" id="student_name" name="student_name"><br>
+        <label for="subject_name">Subject Name:</label>
+        <input type="text" id="subject_name" name="subject_name"><br>
+        <label for="teacher_name">Teacher Name:</label>
+        <select name="teacher_name" id="teacher_name">
+            {% for name in teacher_names %}
+                <option value="{{ name }}">{{ name }}</option>
+            {% endfor %}
+        </select><br>
+        <button type="submit">Submit</button>
+    </form>
+</body>
+</html>

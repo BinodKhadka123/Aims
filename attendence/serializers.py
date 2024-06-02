@@ -34,7 +34,10 @@ def validate_fullname(value):
 def validate_phone_number(value):
     if not str(value).startswith('9') or len(str(value))!=10 or not str(value).isdigit():
         raise ValidationError('Phone number must be a 10-digit number starting with 9.')
-
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['fullname', 'email', 'phone_number']
 class UserRegistrationSerializer(serializers.ModelSerializer):
     fullname = serializers.CharField(validators=[validate_fullname])
     password = serializers.CharField(write_only=True, required=False, default="password@123")
@@ -79,14 +82,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 class UserChangePasswordSerializer(serializers.Serializer):
     password = serializers.CharField(max_length=255, style={'input_type': 'password'}, write_only=True)
-    password2 = serializers.CharField(max_length=255, style={'input_type': 'password'}, write_only=True)
-   
+    
     def validate(self, attrs):
         password = attrs.get('password')
-        password2 = attrs.get('password2')
+        
         user = self.context.get('user')
-        if password != password2:
-            raise serializers.ValidationError("Password and confirm password do not match")
+        if not password.strip():
+            raise serializers.ValidationError("Password should not be blank")
         user.set_password(password)
         user.save()
         return attrs
@@ -124,27 +126,100 @@ class SendPasswordResetEmailSerializer(serializers.Serializer):
         else:
             raise serializers.ValidationError("You are not a registered user")
                 
+
 class UserPasswordRestSerializer(serializers.Serializer):
     password = serializers.CharField(max_length=255, style={'input_type': 'password'}, write_only=True)
-    password2 = serializers.CharField(max_length=255, style={'input_type': 'password'}, write_only=True)
    
     def validate(self, attrs):
+        password = attrs.get('password')
+        
+        if not password.strip():
+            raise serializers.ValidationError("Password should not be blank")
+        
+        uid = self.context.get('uid')
+        token = self.context.get('token')
+
         try:
-            password = attrs.get('password')
-            password2 = attrs.get('password2')
-            uid = self.context.get('uid')
-            token= self.context.get('token')
-            if password != password2:
-                raise serializers.ValidationError("Password and confirm password do not match")
-            id=smart_str(urlsafe_base64_decode(uid))
-            user=User.objects.get(id=id)
-            if not PasswordResetTokenGenerator().check_token(user,token):
-                raise ValidationError('Token is not valid or expire')
-            user.set_password(password)
-            user.save()
-            return attrs
-        except DjangoUnicodeDecodeError as identifier:
-            PasswordResetTokenGenerator().check_token(user,token)
-            raise ValidationError('Token is not valid or expire')
-            
-            
+            id = smart_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(id=id)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            raise serializers.ValidationError("Token is not valid or expired")
+
+        if not PasswordResetTokenGenerator().check_token(user, token):
+            raise serializers.ValidationError("Token is not valid or expired")
+
+        # Set the new password
+        user.set_password(password)
+        user.save()
+        return attrs
+
+
+class UserListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['email', 'fullname', 'phone_number', 'role', 'password']
+
+
+
+class StudentSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = Student
+        fields = ['email', 'fullname', 'phone_number']
+
+
+class GroupSerializer(serializers.ModelSerializer):
+    student_name = StudentSerializer(write_only=True)
+    subject_name = SubjectSerializer()  
+    teacher_name = UserSerializer()
+
+    class Meta:
+        model = Group
+        fields = ['name', 'student_name', 'subject_name', 'teacher_name']
+    def create(self, validated_data):
+        # Extract the nested data
+        student_data = validated_data.pop('student_name')
+        subject_data = validated_data.pop('subject_name')
+        teacher_data = validated_data.pop('teacher_name')
+
+        # Create related objects
+        student = Student.objects.create(**student_data)
+        subject = Subject.objects.create(**subject_data)
+        teacher = User.objects.create(**teacher_data)
+
+        # Create Group object
+        group = Group.objects.create(
+            student_name=student,
+            subject_name=subject,
+            teacher_name=teacher,
+            **validated_data
+        )
+
+        return group
+
+class GroupSerializer(serializers.ModelSerializer):    
+
+    class Meta:
+        model = Group
+        fields = ['name', 'student_name', 'subject_name', 'teacher_name']
+
+    def create(self, validated_data):
+        # Extract the nested data
+        student_data = validated_data.pop('student_name')
+        subject_data = validated_data.pop('subject_name')
+        teacher_data = validated_data.pop('teacher_name')
+
+        # Create related objects
+        student = Student.objects.create(**student_data)
+        subject = Subject.objects.create(**subject_data)
+        teacher = User.objects.create(**teacher_data)
+
+        # Create Group object
+        group = Group.objects.create(
+            student_name=student,
+            subject_name=subject,
+            teacher_name=teacher,
+            **validated_data
+        )
+
+        return group

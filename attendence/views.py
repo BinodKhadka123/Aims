@@ -12,6 +12,7 @@ from rest_framework import status
 from .models import Subject
 from .serializers import *
 from django.contrib.auth import authenticate
+from rest_framework import viewsets
 from .renders import UserRenderer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
@@ -144,7 +145,92 @@ class UserPasswordReset(APIView):
                                 status=status.HTTP_404_NOT_FOUND)
     
     
-            
+class UserList(ListAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserListSerializer
+
+
+    
+class Userdetail(RetrieveAPIView):
+    queryset=User.objects.all()
+    serializer_class=UserListSerializer
+
+class UserDelete(DestroyAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserListSerializer
+    def delete(self,request,*args,**kwargs):
+        return self.destroy(request,*args,**kwargs)
+    
+class AddStudent(ListAPIView, CreateAPIView, ListModelMixin, CreateModelMixin):
+    queryset = Student.objects.all()
+    serializer_class = StudentSerializer
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        try:
+            if serializer.is_valid():
+                self.perform_create(serializer)
+                subject_data = serializer.data
+                success_message = "Student added successfully."
+                response_data = {
+                    'success': True,
+                    'message': success_message,
+                    'data': subject_data,
+                    
+                }
+                return Response(response_data, status=status.HTTP_201_CREATED)
+            else:
+                error_message = "Failed to create subject."  # Modify the error message for failure
+                return Response({'error': error_message}, status=status.HTTP_400_BAD_REQUEST)
+        except ValidationError as e:           
+            return Response({'error_message': str(e)}, 
+                                status=status.HTTP_404_NOT_FOUND)
+class StudentDetail(RetrieveAPIView, UpdateAPIView, DestroyAPIView, RetrieveModelMixin, UpdateModelMixin, DestroyModelMixin):
+    queryset=Student.objects.all()
+    serializer_class=StudentSerializer
+    def patch(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        if serializer.is_valid():
+            self.perform_update(serializer)
+            success_message = "Student Details updated successfully."
+            return Response({'success': True, 'message': success_message}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        success_message = "Student removed successfully."
+        response_data = {
+            'success': True,
+            'message': success_message
+        }
+        return Response(response_data, status=status.HTTP_204_NO_CONTENT)
+    
+
+class GroupViewSet(viewsets.ModelViewSet):
+    queryset = Group.objects.all()
+    serializer_class = GroupSerializer
+    http_method_names = ['get', 'post','patch', 'delete']
+    def get_queryset(self):
+        teacher_users = User.objects.filter(role='teacher')
+        teacher_names = teacher_users.values_list('fullname', flat=True)
+        queryset = Group.objects.filter(teacher_name__fullname__in=teacher_names)
+        print(teacher_names)
+        
+        return queryset
+class GroupCreateView(APIView):
+    def post(self, request, format=None):
+        serializer = GroupSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        
+        
+
+
+          
     
 
 
